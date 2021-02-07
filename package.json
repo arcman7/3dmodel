@@ -1,0 +1,22 @@
+{
+  "name": "3dmodel",
+  "version": "1.0.0",
+  "description": "Demo of 3d game",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andrew Ryan Carpenter",
+  "license": "MIT",
+  "dependencies": {
+    "gl-matrix": "^3.3.0",
+    "js-blp": "^1.0.5",
+    "mdx": "^0.3.1",
+    "mdx-m3-viewer": "^5.1.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.9.0",
+    "webpack-cli": "^4.2.0"
+  }
+}

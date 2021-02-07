@@ -1,0 +1,247 @@
+<html>
+<head>
+  <title> custom mdx library </title>
+  <!-- custom mdx bundle -->
+  <script type="text/javascript" src="dist/mdx_bundle.js"></script>
+  <script type="text/javascript" src="gl-matrix.js"></script>
+  <!-- <script type="text/javascript" src="gl-matrix-addon.js"></script> -->
+  <script id="get-refs" type="text/javascript">
+    // window.originalViewer = ModelViewer.default.viewer
+    // window.originalModelViewer = originalViewer.ModelViewer
+    // var om = new originalModelViewer(document.getElementById('test'))
+    // window.originalLoader = om.load
+  </script>
+</head>
+<body>
+  <canvas id="test" style="width:100%; height: 500px;"></canvas>
+  <script type="text/javascript">
+const canvas = document.getElementById('test');
+const { vec3, mat4 } = window.glMatrix;
+const { parsers, viewer } = mdx_bundle.default;
+const { glMatrix, handlers, ModelViewer,  Scene, Camerea } = viewer;
+const m = new ModelViewer(canvas)
+
+// need this weird version of path solver for custom mdx library
+// function reforgedPathSolver(path) {
+//   const ext = typeof path === "string" ? path.substr(path.lastIndexOf(".")).toLowerCase() : ".mdx"
+//   return ["/reforged/" + path, ext, true];
+// }
+// function classicPathSolver(path) {
+//   const ext = typeof path === "string" ? path.substr(path.lastIndexOf(".")).toLowerCase() : ".mdx"
+//   return ["/classic/" + path, ext, true];
+// }
+
+function reforgedPathSolver(path) {
+  return "/reforged/" + path;
+}
+function classicPathSolver(path) {
+  return "/classic/" + path;
+}
+
+const v3pos = vec3.create(), v3dir = vec3.create(), v3up = vec3.create(), v3sub = vec3.create();
+const m4rot = mat4.create();
+const f32rot = new Float32Array(1);
+
+var v = new ModelViewer(canvas)
+v.on('error', (viewer, error, reason) => {
+  console.log(`Error: ${error}, Reason: ${reason}`);
+});
+let scene = v.addScene();
+scene.camera.move([0, 0, 500]);
+scene.camera.move([100, 10, 50]);
+v.addHandler(handlers.mdx);
+
+window.model =  null
+async function getGrunt(reforged = false) {
+  const usedSolver = reforged ? reforgedPathSolver : classicPathSolver
+  function resolvePath(path) {
+    path = usedSolver(path)
+    const ext = typeof path === "string" ? path.substr(path.lastIndexOf(".")).toLowerCase() : ".mdx";
+    if ([".blp", ".dds", ".gif", ".jpg", ".jpeg", ".png", ".tga"].indexOf(ext) >= 0) {
+      return [data.image(path), ".png", true];
+    } else {
+      const bin = data.binary(path);
+      if (bin) {
+        return [bin.data.buffer, ext, false];
+      } else {
+        return [data.cache.binary(path), ext, true];
+      }
+    }
+  };
+  try {
+    window.model = await (v.load('units/orc/grunt/grunt.mdx', resolvePath, { reforged }))
+  } catch (err) {
+    console.error(err)
+    throw err
+  }
+  console.log('succeeded, reforged: ', reforged)
+  return model
+}
+
+  getGrunt().then(() => {
+    let instance = model.addInstance();
+    scene.addInstance(instance);
+    console.log('starting animation frames for grunt');
+    window.m = new UIModel({ instance, scene })
+  })
+
+class UIModel {
+  constructor({ instance, scene }) {
+    this.yaw = -Math.PI / 2;
+    this.pitch = -Math.PI / 4;
+    this.distance = 400;
+    this.center = vec3.create();
+    this.minDistance = 8;
+    this.maxDistance = 3000
+    this.state = {
+      teamColor: 0
+    }
+    this.canvas = window.canvas
+
+    this.instance = instance
+    this.scene = scene
+    this.onMouseMove = this.onMouseMove.bind(this)
+    this.onMouseDown = this.onMouseDown.bind(this)
+    this.onMouseUp = this.onMouseUp.bind(this)
+    this.onMouseWheel = this.onMouseWheel.bind(this)
+    this.animate = this.animate.bind(this)
+    document.addEventListener('mousedown', this.onMouseDown)
+    document.addEventListener('mousewheel', this.onMouseWheel)
+
+    this.componentDidMount()
+  }
+
+  freeCamera() {
+    if (this.scene) {
+      this.scene.camera.setRotationAroundAngles(this.yaw, this.pitch, this.center, this.distance);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.frame) {
+      cancelAnimationFrame(this.frame);
+      delete this.frame;
+    }
+    this.removeEvents();
+  }
+
+  onMouseDown(e) {
+    document.addEventListener("mousemove", this.onMouseMove, true);
+    document.addEventListener("mouseup", this.onMouseUp, true);
+    this.dragPos = { x: e.clientX, y: e.clientY };
+    e.preventDefault();
+  }
+
+  onMouseMove(e) {
+    if (this.dragPos && this.canvas) {
+      const dx = e.clientX - this.dragPos.x,
+        dy = e.clientY - this.dragPos.y;
+      const dim = (this.canvas.width + this.canvas.height) / 2;
+      this.yaw += dx * 2 * Math.PI / dim;
+      this.pitch += dy * 2 * Math.PI / dim;
+      while (this.yaw > Math.PI) {
+        this.yaw -= Math.PI * 2;
+      }
+      while (this.yaw < -Math.PI) {
+        this.yaw += Math.PI * 2;
+      }
+      this.pitch = Math.min(this.pitch, 0);
+      this.pitch = Math.max(this.pitch, -Math.PI);
+      this.dragPos = {x: e.clientX, y: e.clientY};
+
+      this.setCamera({target: {value: -1}});
+    }
+    e.preventDefault();
+  }
+
+  onMouseUp(e) {
+    delete this.dragPos;
+    this.removeEvents();
+    e.preventDefault();
+  }
+
+  onMouseWheel(e) {
+    if (e.deltaY > 0) {
+      this.distance = Math.min(this.distance * 1.2, this.maxDistance);
+    } else {
+      this.distance = Math.max(this.distance / 1.2, this.minDistance);
+    }
+    this.setCamera({ target: { value: -1 } });
+  }
+
+  setCamera(e) {
+    let cam = parseInt(e.target.value, 10);
+    if (isNaN(cam)) cam = -1;
+    this.cam = cam
+  }
+
+  setTeamColor(e) {
+    let color = parseInt(e.target.value, 10);
+    if (isNaN(color)) color = 0;
+    this.instance.setTeamColor(color)
+  }
+
+  animate(ts) {
+    this.frame = requestAnimationFrame(this.animate);
+    this.scene.camera.viewport([0, 0, this.canvas.width, this.canvas.height]);
+    const model = window.model
+    const cam = model.cameras[this.cam];
+    if (cam) {
+      cam.getPositionTranslation(v3pos, this.instance);
+      cam.getTargetTranslation(v3dir, this.instance);
+      cam.getRotation(f32rot, this.instance);
+      vec3.sub(v3sub, v3dir, v3pos);
+      vec3.normalize(v3sub, v3sub);
+      mat4.fromRotation(m4rot, f32rot[0], v3sub);
+      vec3.set(v3up, 0, 0, 1);
+      vec3.transformMat4(v3up, v3up, m4rot);
+      const aspect = this.canvas.width / this.canvas.height;
+      const vFov = Math.atan(Math.tan(cam.fieldOfView / 2) / aspect) * 2;
+      this.scene.camera.perspective(vFov, aspect, cam.nearClippingPlane, cam.farClippingPlane);
+      this.scene.camera.moveToAndFace(v3pos, v3dir, v3up);
+    } else {
+      this.scene.camera.perspective(Math.PI / 4, this.canvas.width / this.canvas.height, this.minDistance, this.maxDistance);
+      this.freeCamera();
+    }
+
+    this.viewer.updateAndRender();
+  }
+
+  modelLoaded(model, index) {
+    if (!model.ok) {
+      return;
+    }
+    const instance = this.instance; //model.addInstance();
+    if (model.bounds && model.bounds.radius > 0.05) {
+      this.minDistance = Math.min(500, model.bounds.radius * 0.2);
+      this.maxDistance = this.minDistance * 1000;
+      this.distance = this.minDistance * 10;
+    }
+    instance.setTeamColor(state.teamColor);
+    if (model.sequences.length > 0) {
+      instance.setSequence(0);
+    }
+    instance.setSequenceLoopMode(2);
+  }
+
+  componentDidMount() {
+    if (!this.canvas) {
+      return;
+    }
+    const canvas = this.canvas;
+    this.viewer = window.viewer//new ModelViewer.viewer.ModelViewer(canvas);
+    this.viewer.gl.clearColor(0.3, 0.3, 0.3, 1);
+    
+    // this.scene = this.viewer.addScene();
+    this.modelLoaded(model, 0);
+    this.frame = requestAnimationFrame(this.animate);
+  }
+
+  removeEvents() {
+    document.removeEventListener("mousemove", this.onMouseMove, true);
+    document.removeEventListener("mouseup", this.onMouseUp, true);
+  }
+}
+  </script>
+</body>
+<html>
