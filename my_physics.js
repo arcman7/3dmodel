@@ -33,11 +33,13 @@ class Unit {
   constructor(map, model, row, unit) {
     let instance = model.addInstance();
     instance.move(unit.location);
-    instance.rotateLocal(glMatrix.quat.setAxisAngle(glMatrix.quat.create(), ModelViewer.common.glMatrixAddon.VEC3_UNIT_Z, unit.angle));
+    // instance.rotateLocal(glMatrix.quat.setAxisAngle(glMatrix.quat.create(), ModelViewer.common.glMatrixAddon.VEC3_UNIT_Z, unit.angle));
+    instance.setRotation(unit.rotation);
     instance.scale(unit.scale);
     instance.setTeamColor(unit.player);
     instance.setScene(map.worldScene);
-    if (row) {
+    if (row && row.moveHeight) {
+      const heapZ = vec3.create();
       heapZ[2] = row.moveHeight;
       instance.move(heapZ);
       instance.setVertexColor([row.red / 255, row.green / 255, row.blue / 255, 1]);
@@ -120,6 +122,7 @@ let physicsWorld;
 let clock;
 // the rigidBodies array will serve as a collection for all 3d rendered objects that have an associated physics object and that should be updated at each render loop.
 let rigidBodies = [];
+window.rigidBodies = rigidBodies;
 // tmpTrans is for temporary ammo.js transform object that we will be reusing.
 let tmpTrans;
 // this defines the collision groups we’ll be using
@@ -239,13 +242,70 @@ async function createBall() {
   rigidBodies.push(ball);
 }
 
+function createTerrainShape(terrainWidth, terrainDepth) {
+  // This parameter is not really used, since we are using PHY_FLOAT height data type and hence it is ignored
+  var heightScale = 1;
+
+  // Up axis = 0 for X, 1 for Y, 2 for Z. Normally 1 = Y is used.
+  var upAxis = 1;
+
+  // hdt, height data type. "PHY_FLOAT" is used. Possible values are "PHY_FLOAT", "PHY_UCHAR", "PHY_SHORT"
+  var hdt = "PHY_FLOAT";
+
+  // Set this to your needs (inverts the triangles)
+  var flipQuadEdges = false;
+
+  // Creates height data buffer in Ammo heap
+  var ammoHeightData = Ammo._malloc( 4 * terrainWidth * terrainDepth );
+  // var p = 0;
+  var p2 = 0;
+  const corners = window.viewer.corners;
+  let terrainMinHeight = corners[0][0].groundHeight;
+  let terrainMaxHeight = corners[0][0].groundHeight;
+  for (let y = 0; y < terrainDepth; y++) {
+    for (let x = 0; x < terrainWidth; x++) {
+      // let [columns, rows] = viewer.mapSize;
+      // write 32-bit float data to memory
+      Ammo.HEAPF32[ammoHeightData + p2 >> 2] = corners[y][x].groundHeight;
+      if (terrainMaxHeight < corners[y][x].groundHeight) {
+        terrainMaxHeight = corners[y][x].groundHeight
+      }
+      if (terrainMinHeight > corners[y][x].groundHeight) {
+        terrainMinHeight = corners[y][x].groundHeight
+      }
+      // p ++;
+
+      // 4 bytes/float
+      p2 += 4;
+    }
+  }
+  // Creates the heightfield physics shape
+  var heightFieldShape = new Ammo.btHeightfieldTerrainShape(
+
+    terrainWidth,
+    terrainDepth,
+
+    ammoHeightData,
+
+    heightScale,
+    terrainMinHeight,
+    terrainMaxHeight,
+
+    upAxis,
+    hdt,
+    flipQuadEdges
+  );
+  heightFieldShape.setMargin( 0.05 );
+  return heightFieldShape;
+}
+
 function updatePhysics( deltaTime ) {
   // Step world
   physicsWorld.stepSimulation( deltaTime, 10 );
   // Update rigid bodies
   for ( let i = 0; i < rigidBodies.length; i++ ) {
       let mdxM3Obj = rigidBodies[ i ];
-      let objAmmo = mdxM3Obj.userData.physicsBody;
+      let objAmmo = mdxM3Obj.physicsBody;
       let ms = objAmmo.getMotionState();
       if ( ms ) {
           ms.getWorldTransform( tmpTrans );
@@ -283,7 +343,13 @@ prom.then(() => {
     tmpTrans = new Ammo.btTransform();
     setupPhysicsWorld();
     createBlock();
-    await createBall();
+    window.texture = viewer.load('textures/shockwave_ice1.blp');
+    const pos = [0,0,0];
+    const zCoord = heightAt(pos);
+    pos[2] = zCoord;
+    window.u = await addGruntUnit(pos);
+    await addSphere(20, window.texture, pos);
+    // await createBall();
     renderFrame();
   }
   if (!Ammo.ready) {

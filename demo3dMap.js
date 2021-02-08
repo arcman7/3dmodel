@@ -154,12 +154,6 @@ viewer.solverParams['hd'] = reforged;
 let statusElement = document.getElementById('status');
 statusElement.textContent = 'Initializing the viewer';
 
-// let canvas = document.getElementById('canvas');
-// let viewer = new ModelViewer.viewer.handlers.War3MapViewer(canvas, wc3PathSolver);
-// viewer.solverParams = viewer.solverParams || {};
-// viewer.solverParams['reforged'] = false;
-// viewer.solverParams['hd'] = false;
-
 let thingsLoading = [];
 // use this ref in my_physics.js
 window.thingsLoading = thingsLoading;
