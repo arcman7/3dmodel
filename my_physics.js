@@ -198,7 +198,7 @@ function createBlock() {
 
 
 async function createBall() {
-  let pos = {x: -100, y: 0, z: 100};
+  let pos = {x: -100, y: 0, z: 150};
   let radius = 20;
   // let radius = 2;
   let quat = {x: 0, y: 0, z: 0, w: 1};
@@ -206,12 +206,12 @@ async function createBall() {
 
   //mdx-m3-viewer Section
   window.texture = viewer.load('textures/shockwave_ice1.blp');
-  window.spherePrimitive = ModelViewer.utils.mdx.primitives.createSphere(20,20,20);
-  window.sphereModel = await ModelViewer.utils.mdx.createPrimitive(viewer, spherePrimitive , { texture });
+  window.spherePrimitive = ModelViewer.utils.mdlx.primitives.createSphere(20,20,20);
+  window.sphereModel = await ModelViewer.utils.mdlx.createPrimitive(viewer, spherePrimitive , { texture });
   window.sphereInstance = sphereModel.addInstance();
-  // window.Unit = Object.getPrototypeOf(viewer.units[0]).constructor;
+  // window.Unit = Object.getPrototypeOf(viewer.map.units[0]).constructor;
   window.testUnitInfo = { "location":[0,0,0],"rotation":[0,0,0,1],"player":0,"scale":[1,1,1] };
-  viewer.units.push(new Unit(viewer, sphereModel , undefined, testUnitInfo ));
+  viewer.map.units.push(new Unit(viewer, sphereModel , undefined, testUnitInfo ));
   viewer.worldScene.addInstance(sphereInstance);
   sphereInstance.move([pos.x, pos.y, pos.z]);
 
@@ -237,8 +237,7 @@ async function createBall() {
   // physicsWorld.addRigidBody( body, colGroupBlackBall, colGroupPlane );
   physicsWorld.addRigidBody( body );
   // body.setActivationState(DISABLE_DEACTIVATION); //freezes object
-  ball.userData = {}
-  ball.userData.physicsBody = body;
+  ball.physicsBody = body;
   rigidBodies.push(ball);
 }
 
@@ -259,12 +258,11 @@ function createTerrainShape(terrainWidth, terrainDepth) {
   var ammoHeightData = Ammo._malloc( 4 * terrainWidth * terrainDepth );
   // var p = 0;
   var p2 = 0;
-  const corners = window.viewer.corners;
+  const corners = window.viewer.map.corners;
   let terrainMinHeight = corners[0][0].groundHeight;
   let terrainMaxHeight = corners[0][0].groundHeight;
   for (let y = 0; y < terrainDepth; y++) {
     for (let x = 0; x < terrainWidth; x++) {
-      // let [columns, rows] = viewer.mapSize;
       // write 32-bit float data to memory
       Ammo.HEAPF32[ammoHeightData + p2 >> 2] = corners[y][x].groundHeight;
       if (terrainMaxHeight < corners[y][x].groundHeight) {
@@ -296,7 +294,25 @@ function createTerrainShape(terrainWidth, terrainDepth) {
     flipQuadEdges
   );
   heightFieldShape.setMargin( 0.05 );
+  heightFieldShape._terrainMaxHeight = terrainMaxHeight
+  heightFieldShape._terrainMinHeight = terrainMinHeight
   return heightFieldShape;
+}
+
+function createPhysicsTerrainShape(terrainWidth, terrainDepth) {
+  // Create the terrain body
+  groundShape = createTerrainShape(terrainWidth, terrainDepth);
+  const terrainMaxHeight = groundShape._terrainMaxHeight;
+  const terrainMinHeight = groundShape._terrainMinHeight;
+  var groundTransform = new Ammo.btTransform();
+  groundTransform.setIdentity();
+  // Shifts the terrain, since bullet re-centers it on its bounding box.
+  // groundTransform.setOrigin( new Ammo.btVector3( 0, ( terrainMaxHeight + terrainMinHeight ) / 2, 0 ) );
+  var groundMass = 0;
+  var groundLocalInertia = new Ammo.btVector3( 0, 0, 0 );
+  var groundMotionState = new Ammo.btDefaultMotionState( groundTransform );
+  var groundBody = new Ammo.btRigidBody( new Ammo.btRigidBodyConstructionInfo( groundMass, groundMotionState, groundShape, groundLocalInertia ) );
+  physicsWorld.addRigidBody( groundBody );
 }
 
 function updatePhysics( deltaTime ) {
@@ -325,40 +341,40 @@ window.rotateZWithMouseCursor = function rotateZWithMouseCursor(unit, angle) {
   unit.setRotation(rotationQuat);
 };
 
-// Wait for map to load (user must chose a map first)
-const prom = new Promise((resolve) => {
-  const intervalTimer = setInterval(() => {
-    if (window.mapLoaded === true) {
-      clearInterval(intervalTimer);
-      window.mapWidth = viewer.worldScene.grid.width;
-      window.mapDepth = viewer.worldScene.grid.depth;
-      resolve();
-    }
-  }, 50);
-});
-prom.then(() => {
-// Ammojs Initialization
-  async function setup() {
-    window.stopUsingStep = true;
-    tmpTrans = new Ammo.btTransform();
-    setupPhysicsWorld();
-    createBlock();
-    window.texture = viewer.load('textures/shockwave_ice1.blp');
-    const pos = [0,0,0];
-    const zCoord = heightAt(pos);
-    pos[2] = zCoord;
-    window.u = await addGruntUnit(pos);
-    await addSphere(20, window.texture, pos);
-    // await createBall();
-    renderFrame();
-  }
-  if (!Ammo.ready) {
-    Ammo().then(setup);
-  } else {
-    setup();
-  }
+// // Wait for map to load (user must chose a map first)
+// const prom = new Promise((resolve) => {
+//   const intervalTimer = setInterval(() => {
+//     if (window.mapLoaded === true) {
+//       clearInterval(intervalTimer);
+//       window.mapWidth = viewer.worldScene.grid.width;
+//       window.mapDepth = viewer.worldScene.grid.depth;
+//       resolve();
+//     }
+//   }, 50);
+// });
+// prom.then(() => {
+// // Ammojs Initialization
+//   async function setup() {
+//     window.stopUsingStep = true;
+//     tmpTrans = new Ammo.btTransform();
+//     setupPhysicsWorld();
+//     createBlock();
+//     window.texture = viewer.load('textures/shockwave_ice1.blp');
+//     const pos = [0,0,0];
+//     const zCoord = heightAt(pos);
+//     pos[2] = zCoord;
+//     window.u = await addGruntUnit(pos);
+//     await addSphere(20, window.texture, pos);
+//     // await createBall();
+//     renderFrame();
+//   }
+//   if (!Ammo.ready) {
+//     Ammo().then(setup);
+//   } else {
+//     setup();
+//   }
   
-});
+// });
 
 //http-server -p 3000 --cors
 //getFirstUnit(); setArrowKeyListener(); u = unitInstance;

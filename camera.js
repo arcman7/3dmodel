@@ -41,10 +41,12 @@ function setupCamera(scene, options = {}) {
     vec3.transformQuat(position, position, quatHeap);
     vec3.scale(position, position, camera.distance);
     vec3.add(position, position, target);
-    // maintain proper camera height - game play
-    // position[2] = 217.27;
+
     camera.moveToAndFace(position, target, worldUp);
   }
+
+  // give ref to update function for player nav controls
+  camera.ref_update = update;
 
   update();
 
@@ -102,7 +104,9 @@ function setupCamera(scene, options = {}) {
     canvas.width = width;
     canvas.height = height;
 
-    camera.setViewport(0, 0, width, height);
+    scene.viewport[2] = width;
+    scene.viewport[3] = height;
+    
     camera.perspective(Math.PI / 4, width / height, 8, 20000);
   }
 

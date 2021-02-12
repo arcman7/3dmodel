@@ -27,55 +27,21 @@ const TeamColors = [
 ];
 
 
-function heightAt(location) {
-  let corners = window.viewer.corners;
-  let centerOffset = window.viewer.centerOffset;
-  let x = (location[0] - centerOffset[0]) / 128;
-  let y = (location[1] - centerOffset[1]) / 128;
-
-  let minY = Math.floor(y),
-    maxY = Math.ceil(y),
-    minX = Math.floor(x),
-    maxX = Math.ceil(x);
-
-  // See if this coordinate is in the map
-  if (maxY > 0 && minY < corners.length - 1 && maxX > 0 && minX < corners[0].length - 1) {
-    // See http://gamedev.stackexchange.com/a/24574
-    let triZ0 = corners[minY][minX].groundHeight,
-      triZ1 = corners[minY][maxX].groundHeight,
-      triZ2 = corners[maxY][minX].groundHeight,
-      triZ3 = corners[maxY][maxX].groundHeight,
-      sqX = x - minX,
-      sqZ = y - minY,
-      height;
-
-    if ((sqX + sqZ) < 1) {
-      height = triZ0 + (triZ1 - triZ0) * sqX + (triZ2 - triZ0) * sqZ;
-    } else {
-      height = triZ3 + (triZ1 - triZ3) * (1 - sqZ) + (triZ2 - triZ3) * (1 - sqX);
-    }
-
-    return height * 128;
-  }
-  return 0;
-}
-// heightAt([0,0,0])
-
 async function createCylinderViewModel(r, h, texture, pos = [0, 0, 0]) {
-  const cylinderPrimitive = ModelViewer.utils.mdx.primitives.createCylinder(r, h, 1);
-  const cylinderModel =  await ModelViewer.utils.mdx.createPrimitive(viewer, cylinderPrimitive, { texture });
+  const cylinderPrimitive = ModelViewer.utils.mdlx.primitives.createCylinder(r, h, 1);
+  const cylinderModel =  await ModelViewer.utils.mdlx.createPrimitive(viewer, cylinderPrimitive, { texture });
   const cylinderInstance = cylinderModel.addInstance();
   const mockUnitInfo = { "location": pos,"rotation":[0,0,0,1],"player":0,"scale":[1,1,1] };
-  viewer.units.push(new Unit(viewer, cylinderModel, undefined, mockUnitInfo));
+  viewer.map.units.push(new Unit(viewer, cylinderModel, undefined, mockUnitInfo));
   viewer.worldScene.addInstance(cylinderInstance);
   return cylinderInstance;
 }
 async function createSphereViewModel(r, texture, pos = [0, 0, 0]) {
-  const sherePrimitive = ModelViewer.utils.mdx.primitives.createSphere(r);
-  const sphereModel = await ModelViewer.utils.mdx.createPrimitive(viewer, sherePrimitive, { texture });
+  const sherePrimitive = ModelViewer.utils.mdlx.primitives.createSphere(r);
+  const sphereModel = await ModelViewer.utils.mdlx.createPrimitive(viewer, sherePrimitive, { texture });
   const sphereInstance = sphereModel.addInstance();
   const mockUnitInfo = { "location": pos,"rotation":[0,0,0,1],"player":0,"scale":[1,1,1] };
-  viewer.units.push(new Unit(viewer, sphereModel, undefined, mockUnitInfo));
+  viewer.map.units.push(new Unit(viewer, sphereModel, undefined, mockUnitInfo));
   viewer.worldScene.addInstance(sphereInstance);
   sphereInstance.setLocation(pos)
   return sphereInstance;
@@ -196,22 +162,58 @@ async function getGruntModel(reforged = false, hd = false) {
   return window.gruntModel
 }
 
-async function addGruntUnit(pos = [0, 0, 0]) {
+async function addGruntUnit(pos = [0, 0, 0], rotation = [0,0,0,1]) {
+  console.log('adding grunt unit')
   const model = window.gruntModel || await getGruntModel(false, false);
-  const mockUnitInfo = { "location": pos,"rotation":[0,0,0,1], "angle":[0,0,0,1], "player":0,"scale":[1,1,1] };
-  viewer.units.push(new Unit(viewer, model, {'comment(s)': 'Grunt'}, mockUnitInfo));
+  const mockUnitInfo = { "location": pos,"rotation":rotation, "angle":[0,0,0,1], "player":0,"scale":[1,1,1] };
+  viewer.map.units.push(new Unit(viewer, model, {'comment(s)': 'Grunt'}, mockUnitInfo));
   let instance = model.addInstance();
-  scene.addInstance(instance);
+  viewer.worldScene.addInstance(instance);
   instance.setLocation(pos);
   return instance
 }
 
 
+// Wait for map to load (user must chose a map first)
+const prom = new Promise((resolve) => {
+  const intervalTimer = setInterval(() => {
+    if (window.mapLoaded === true) {
+      clearInterval(intervalTimer);
+      window.mapWidth = viewer.worldScene.grid.width;
+      window.mapDepth = viewer.worldScene.grid.depth;
+      resolve();
+    }
+  }, 50);
+});
+prom.then(() => {
+// Ammojs Initialization
+  async function setup() {
+    setupCamera(viewer.worldScene, 3000);
 
-async function setThingsUp() {
-  const pos = [0,0,0]
-  const zCoord = heightAt(pos.slice(0,2));
-  pos[2] = zCoord;
-  // window.texture = viewer.load('textures/shockwave_ice1.blp');
-  window.u = await addGruntUnit(pos);
-}
+    window.stopUsingStep = true;
+    tmpTrans = new Ammo.btTransform();
+    setupPhysicsWorld();
+    // createBlock();
+    createPhysicsTerrainShape(...window.viewer.map.mapSize);
+    window.texture = viewer.load('textures/shockwave_ice1.blp');
+    const pos = [100,0,0];
+    const zCoord = heightAt(pos);
+    pos[2] = zCoord;
+    window.cam = viewer.worldScene.camera;
+    const rot = [0,0,0,1];
+    quat.rotateZ(rot, rot, Math.PI);
+    window.u = await addGruntUnit(pos, rot);
+    // await addSphere(20, window.texture, pos);
+    await createBall();
+    renderFrame();
+    getFirstUnit();
+    setArrowKeyListener();
+
+  }
+  if (!Ammo.ready) {
+    Ammo().then(setup);
+  } else {
+    setup();
+  }
+  
+});

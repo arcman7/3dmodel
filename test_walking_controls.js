@@ -8,8 +8,8 @@
  */
 
 function heightAt(location) {
-    let corners = window.viewer.corners;
-    let centerOffset = window.viewer.centerOffset;
+    let corners = window.viewer.map.corners;
+    let centerOffset = window.viewer.map.centerOffset;
     let x = (location[0] - centerOffset[0]) / 128;
     let y = (location[1] - centerOffset[1]) / 128;
   
@@ -43,12 +43,12 @@ function heightAt(location) {
 let unitType = 'Grunt';
 function getFirstUnit(opts = { 'comment(s)': unitType ? unitType : 'bandit' }) {
     // window.viewer = viewer;
-    window.cam = viewer.worldScene.camera;
+    // window.cam = viewer.worldScene.camera;
     const usedKey = Object.keys(opts)[0];
-    const n = window.viewer.units.length;
-    // console.log(viewer.units)
+    const n = window.viewer.map.units.length;
+    // console.log(viewer.map.units)
     for (let i = 0; i < n; i++) {
-        const unit = window.viewer.units[i]
+        const unit = window.viewer.map.units[i]
         if (unit.row && unit.row[usedKey] === opts[usedKey]) {
             window.unitInstance = unit.instance;
             window.u = window.unitInstance;
@@ -139,7 +139,6 @@ function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpe
     }
     function listenForArrow(e) {
 
-
         function stopMoving(e) {
             switch (e.keyCode) {
                 case 37: // arrow key left
@@ -173,48 +172,35 @@ function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpe
         switch (e.keyCode) {
             case 37: // arrow key left
                 move(cam.directionX, [0, 0], negSpeed, distanceDelta);
-                cam.move(distanceDelta);
-                unitInstance.move(distanceDelta);
                 break;
             case 65: // a key
                 move(cam.directionX, [0, 0], negSpeed, distanceDelta);
-                cam.move(distanceDelta);
-                unitInstance.move(distanceDelta);
                 break;
             case 38: // arrow key up
                 move([0, 0], cam.directionY, speed, distanceDelta);
-                cam.move(distanceDelta);
-                unitInstance.move(distanceDelta);
                 break;
             case 87: // w key
                 move([0, 0], cam.directionY, speed, distanceDelta);
-                cam.move(distanceDelta);
-                unitInstance.move(distanceDelta);
                 break;
             case 39: // arrow key right
                 move(cam.directionX, [0, 0], speed, distanceDelta);
-                cam.move(distanceDelta)
-                unitInstance.move(distanceDelta)
                 break;
             case 68: // d key
                 move(cam.directionX, [0, 0], speed, distanceDelta);
-                cam.move(distanceDelta)
-                unitInstance.move(distanceDelta)
                 break; 
             case 40: // arrow key down
                 move([0, 0], cam.directionY, negSpeed, distanceDelta);
-                cam.move(distanceDelta);
-                unitInstance.move(distanceDelta);
                 break;
             case 83: // s key
                 move([0, 0], cam.directionY, negSpeed, distanceDelta);
-                cam.move(distanceDelta);
-                unitInstance.move(distanceDelta);
                 break; 
             default:
                 console.log("default returning");
                 return;
         }
+        cam.move(distanceDelta);
+        unitInstance.move(distanceDelta);
+
         var tmp = unitInstance.localLocation
         var zCoord = heightAt(tmp);
         unitInstance.setLocation([tmp[0], tmp[1], zCoord]);
@@ -222,6 +208,7 @@ function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpe
         // vec3.set(cam.target, unitInstance.localLocation[0], unitInstance.localLocation[1], 0);
         vec3.set(cam.target, unitInstance.localLocation[0], unitInstance.localLocation[1], unitInstance.localLocation[2]);
         vec3.set(cam.position, cam.location[0], cam.location[1], cam.position[2]);
+        cam.ref_update();
         // cam.distance = 410;
         if (!isWalking) {
             console.log('setting walk sequence: ', seqWalk);
