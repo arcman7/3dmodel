@@ -135,7 +135,7 @@ function setupPhysicsWorld() {
   solver                  = new Ammo.btSequentialImpulseConstraintSolver();
 
   physicsWorld           = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-  physicsWorld.setGravity(new Ammo.btVector3(0, -10, 0));
+  physicsWorld.setGravity(new Ammo.btVector3(0, 0, -20));
 
   // I moved clock initialization to here
   clock = new Clock();
@@ -175,11 +175,11 @@ function createBlock() {
   //Ammojs Section
   let transform = new Ammo.btTransform();
   transform.setIdentity();
-  transform.setOrigin( new Ammo.btVector3( pos.x, pos.z, pos.y ) );
-  transform.setRotation( new Ammo.btQuaternion( quat.x, quat.z, quat.y, quat.w ) );
+  transform.setOrigin( new Ammo.btVector3( pos.x, pos.y, pos.z ) );
+  transform.setRotation( new Ammo.btQuaternion( quat.x, quat.y, quat.z, quat.w ) );
   let motionState = new Ammo.btDefaultMotionState( transform );
 
-  let colShape = new Ammo.btBoxShape(new Ammo.btVector3( scale.x , scale.z , scale.y  ) );
+  let colShape = new Ammo.btBoxShape(new Ammo.btVector3( scale.x , scale.y , scale.z  ) );
   colShape.setMargin( 0.05 );
 
   let localInertia = new Ammo.btVector3( 0, 0, 0 );
@@ -198,19 +198,20 @@ function createBlock() {
 
 
 async function createBall() {
-  let pos = {x: -100, y: 0, z: 150};
+  let pos = {x: 0, y: 0, z: 150};
   let radius = 20;
   // let radius = 2;
   let quat = {x: 0, y: 0, z: 0, w: 1};
-  let mass = 1;
+  let mass = 5;
 
   //mdx-m3-viewer Section
-  window.texture = viewer.load('textures/shockwave_ice1.blp');
+  // window.texture = viewer.load('textures/shockwave_ice1.blp');
+  window.texture = viewer.load('textures/soccer.blp');
   window.spherePrimitive = ModelViewer.utils.mdlx.primitives.createSphere(20,20,20);
   window.sphereModel = await ModelViewer.utils.mdlx.createPrimitive(viewer, spherePrimitive , { texture });
   window.sphereInstance = sphereModel.addInstance();
   // window.Unit = Object.getPrototypeOf(viewer.map.units[0]).constructor;
-  window.testUnitInfo = { "location":[0,0,0],"rotation":[0,0,0,1],"player":0,"scale":[1,1,1] };
+  window.testUnitInfo = { "location":[0,0,-1000],"rotation":[0,0,0,1],"player":0,"scale":[1,1,1] };
   viewer.map.units.push(new Unit(viewer, sphereModel , undefined, testUnitInfo ));
   viewer.worldScene.addInstance(sphereInstance);
   sphereInstance.move([pos.x, pos.y, pos.z]);
@@ -218,11 +219,11 @@ async function createBall() {
   //Ammojs Section
   let transform = new Ammo.btTransform();
   transform.setIdentity();
-  transform.setOrigin( new Ammo.btVector3( pos.x, pos.z, pos.y ) );
-  transform.setRotation( new Ammo.btQuaternion( quat.x, quat.z, quat.y, quat.w ) );
+  transform.setOrigin( new Ammo.btVector3( pos.x, pos.y, pos.z ) );
+  transform.setRotation( new Ammo.btQuaternion( quat.x, quat.y, quat.z, quat.w ) );
   let motionState = new Ammo.btDefaultMotionState( transform );
 
-  let colShape = new Ammo.btSphereShape( radius );
+  let colShape = new Ammo.btSphereShape(20);
   colShape.setMargin( 0.05 );
 
   let localInertia = new Ammo.btVector3( 0, 0, 0 );
@@ -239,6 +240,7 @@ async function createBall() {
   // body.setActivationState(DISABLE_DEACTIVATION); //freezes object
   ball.physicsBody = body;
   rigidBodies.push(ball);
+  return sphereInstance;
 }
 
 function createTerrainShape(terrainWidth, terrainDepth) {
@@ -246,7 +248,7 @@ function createTerrainShape(terrainWidth, terrainDepth) {
   var heightScale = 1;
 
   // Up axis = 0 for X, 1 for Y, 2 for Z. Normally 1 = Y is used.
-  var upAxis = 1;
+  var upAxis = 2;
 
   // hdt, height data type. "PHY_FLOAT" is used. Possible values are "PHY_FLOAT", "PHY_UCHAR", "PHY_SHORT"
   var hdt = "PHY_FLOAT";
@@ -261,9 +263,21 @@ function createTerrainShape(terrainWidth, terrainDepth) {
   const corners = window.viewer.map.corners;
   let terrainMinHeight = corners[0][0].groundHeight;
   let terrainMaxHeight = corners[0][0].groundHeight;
+  let h;
+  let corner;
+  // const centerOffset = window.viewer.map.centerOffset;
   for (let y = 0; y < terrainDepth; y++) {
+  // for (let y = terrainDepth - 1; y > -1; y--) {
     for (let x = 0; x < terrainWidth; x++) {
+    // for (let x = terrainWidth - 1; x > -1; x--) {
       // write 32-bit float data to memory
+      // Ammo.HEAPF32[ammoHeightData + p2 >> 2] = corners[y][x].groundHeight * 128;
+      // if (terrainMaxHeight < corners[y][x].groundHeight * 128) {
+      //   terrainMaxHeight = corners[y][x].groundHeight * 128
+      // }
+      // if (terrainMinHeight > corners[y][x].groundHeight * 128) {
+      //   terrainMinHeight = corners[y][x].groundHeight * 128
+      // }
       Ammo.HEAPF32[ammoHeightData + p2 >> 2] = corners[y][x].groundHeight;
       if (terrainMaxHeight < corners[y][x].groundHeight) {
         terrainMaxHeight = corners[y][x].groundHeight
@@ -271,6 +285,17 @@ function createTerrainShape(terrainWidth, terrainDepth) {
       if (terrainMinHeight > corners[y][x].groundHeight) {
         terrainMinHeight = corners[y][x].groundHeight
       }
+      // corner = corners[y][x]
+      // h = heightAt([x * 128 + centerOffset[0], y * 128 + centerOffset[1]])
+      // Ammo.HEAPF32[ammoHeightData + p2 >> 2] = h /// 128;
+      // console.log(h, h/8)
+      // Ammo.HEAPF32[ammoHeightData + p2 >> 2] = corners[y][x].groundHeight;
+      // if (terrainMaxHeight < h) {
+      //   terrainMaxHeight = h
+      // }
+      // if (terrainMinHeight > h) {
+      //   terrainMinHeight = h
+      // }
       // p ++;
 
       // 4 bytes/float
@@ -282,6 +307,8 @@ function createTerrainShape(terrainWidth, terrainDepth) {
 
     terrainWidth,
     terrainDepth,
+    // terrainDepth,
+    // terrainWidth,
 
     ammoHeightData,
 
@@ -293,9 +320,14 @@ function createTerrainShape(terrainWidth, terrainDepth) {
     hdt,
     flipQuadEdges
   );
+  const scaleX = window.mapWidth / (terrainWidth);
+  const scaleY = window.mapDepth / (terrainDepth);
+  // heightFieldShape.setLocalScaling( new Ammo.btVector3( 128, 128, 128 ) );
+  heightFieldShape.setLocalScaling( new Ammo.btVector3(scaleX, scaleY, 128 ) );
   heightFieldShape.setMargin( 0.05 );
-  heightFieldShape._terrainMaxHeight = terrainMaxHeight
-  heightFieldShape._terrainMinHeight = terrainMinHeight
+  heightFieldShape._terrainMaxHeight = terrainMaxHeight * 128
+  heightFieldShape._terrainMinHeight = terrainMinHeight * 128
+  window.t = heightFieldShape
   return heightFieldShape;
 }
 
@@ -306,12 +338,22 @@ function createPhysicsTerrainShape(terrainWidth, terrainDepth) {
   const terrainMinHeight = groundShape._terrainMinHeight;
   var groundTransform = new Ammo.btTransform();
   groundTransform.setIdentity();
+  const centerOffset = window.viewer.map.centerOffset;
   // Shifts the terrain, since bullet re-centers it on its bounding box.
   // groundTransform.setOrigin( new Ammo.btVector3( 0, ( terrainMaxHeight + terrainMinHeight ) / 2, 0 ) );
+  // groundTransform.setOrigin( new Ammo.btVector3( -1*centerOffset[0], -1*centerOffset[1], ( terrainMaxHeight + terrainMinHeight ) / 2 ) );
+  // groundTransform.setOrigin( new Ammo.btVector3( 0, 0, ( terrainMaxHeight + terrainMinHeight ) / 2 ) );
+  groundTransform.setOrigin( new Ammo.btVector3( -500, 0, ( terrainMaxHeight + terrainMinHeight ) / 2 ) );
+
+
+  // console.log('using: ',  , ( terrainMaxHeight + terrainMinHeight ) / 2, 0)
+  // groundTransform.setOrigin( new Ammo.btVector3( terrainWidth / 2, 0, terrainDepth / 2 ) );
+  // groundTransform.setOrigin( new Ammo.btVector3( 0, 0, 0 ) );
   var groundMass = 0;
   var groundLocalInertia = new Ammo.btVector3( 0, 0, 0 );
   var groundMotionState = new Ammo.btDefaultMotionState( groundTransform );
   var groundBody = new Ammo.btRigidBody( new Ammo.btRigidBodyConstructionInfo( groundMass, groundMotionState, groundShape, groundLocalInertia ) );
+  groundBody.setFriction(1);
   physicsWorld.addRigidBody( groundBody );
 }
 
@@ -324,14 +366,20 @@ function updatePhysics( deltaTime ) {
       let objAmmo = mdxM3Obj.physicsBody;
       let ms = objAmmo.getMotionState();
       if ( ms ) {
+        // strictly controlled by user or other mechanics (not physics)
+        if (mdxM3Obj.kinematic) { 
+          mdxM3Obj.physicsTmpPos.setValue(...mdxM3Obj.localLocation);
+          tmpTrans.setIdentity();
+          tmpTrans.setOrigin( mdxM3Obj.physicsTmpPos );
+          ms.setWorldTransform(tmpTrans);
+        } else {
           ms.getWorldTransform( tmpTrans );
           let p = tmpTrans.getOrigin();
           let q = tmpTrans.getRotation();
           // console.log(Math.round(p.x()), Math.round(p.z()), Math.round(p.y()))
-          // need to invert y and z axis
-          mdxM3Obj.setLocation([ p.x(), p.z(), p.y() ]);
-          mdxM3Obj.setRotation([ q.x(), q.z(), q.y(), q.w() ]);
-
+          mdxM3Obj.setLocation([ p.x(), p.y(), p.z() ]);
+          mdxM3Obj.setRotation([ q.x(), q.y(), q.z(), q.w() ]);
+        }
       }
   }
 }
@@ -341,40 +389,7 @@ window.rotateZWithMouseCursor = function rotateZWithMouseCursor(unit, angle) {
   unit.setRotation(rotationQuat);
 };
 
-// // Wait for map to load (user must chose a map first)
-// const prom = new Promise((resolve) => {
-//   const intervalTimer = setInterval(() => {
-//     if (window.mapLoaded === true) {
-//       clearInterval(intervalTimer);
-//       window.mapWidth = viewer.worldScene.grid.width;
-//       window.mapDepth = viewer.worldScene.grid.depth;
-//       resolve();
-//     }
-//   }, 50);
-// });
-// prom.then(() => {
-// // Ammojs Initialization
-//   async function setup() {
-//     window.stopUsingStep = true;
-//     tmpTrans = new Ammo.btTransform();
-//     setupPhysicsWorld();
-//     createBlock();
-//     window.texture = viewer.load('textures/shockwave_ice1.blp');
-//     const pos = [0,0,0];
-//     const zCoord = heightAt(pos);
-//     pos[2] = zCoord;
-//     window.u = await addGruntUnit(pos);
-//     await addSphere(20, window.texture, pos);
-//     // await createBall();
-//     renderFrame();
-//   }
-//   if (!Ammo.ready) {
-//     Ammo().then(setup);
-//   } else {
-//     setup();
-//   }
-  
-// });
-
+/*
 //http-server -p 3000 --cors
 //getFirstUnit(); setArrowKeyListener(); u = unitInstance;
+*/

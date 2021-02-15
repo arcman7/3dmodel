@@ -19,7 +19,7 @@ function heightAt(location) {
       maxX = Math.ceil(x);
   
     // See if this coordinate is in the map
-    if (maxY > 0 && minY < corners.length - 1 && maxX > 0 && minX < corners[0].length - 1) {
+    if (maxY >= 0 && minY < corners.length - 1 && maxX >= 0 && minX < corners[0].length - 1) {
       // See http://gamedev.stackexchange.com/a/24574
       let triZ0 = corners[minY][minX].groundHeight,
         triZ1 = corners[minY][maxX].groundHeight,
@@ -84,14 +84,15 @@ function vec4Mul(a, b) {
 
 
 let usedArrowListener;
-function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpeed = 20) {
+function setArrowKeyListener({ camera, unitInstance, walkSpeed = 20 }) {
     console.log('setting up walking listeners');
+    const unit = unitInstance || window.unitInstance 
     const cam = camera || window.viewer.worldScene.camera
     let isWalking = false;
     let seqWalk;
     let seqStand;
-    unitInstance.userSetSequence = true;
-    unitInstance.model.sequences.forEach((seq, i) => {
+    unit.userSetSequence = true;
+    unit.model.sequences.forEach((seq, i) => {
         if (seq.name.match(/walk/i)) {
             seqWalk = i;
         }
@@ -100,12 +101,8 @@ function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpe
         }
     });
 
-    /*
-    getFirstUnit(); setArrowKeyListener(); u = unitInstance;
-    */
-
-    const speed = 20;
-    const negSpeed = -20;
+    const speed = walkSpeed;
+    const negSpeed = -1 * walkSpeed;
     window.vecHeap = vec3.create();
     function move(dirX, dirY, moveSpeed, target) {
         // Allow only movement on the XY plane, and scale to moveSpeed.
@@ -134,8 +131,8 @@ function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpe
     const quatHeap = window.quatHeap || quat.create();
 
     cam.onrotate = function(theta, phi) {
-        quat.rotateZ(quatHeap, unitInstance.localRotation, theta);
-        unitInstance.setRotation(quatHeap);
+        quat.rotateZ(quatHeap, unit.localRotation, theta);
+        unit.setRotation(quatHeap);
     }
     function listenForArrow(e) {
 
@@ -162,10 +159,8 @@ function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpe
                     return;
             }
             console.log('setting stand sequence (STOP): ', seqStand);
-            unitInstance.setSequence(seqStand);
+            unit.setSequence(seqStand);
             isWalking = false;
-            // console.log('cam postion: ', cam.position)
-            // console.log('cam target: ', cam.target)
             document.removeEventListener('keyup', stopMoving);
         }
         let distanceDelta = vec3.create();
@@ -199,29 +194,48 @@ function setArrowKeyListener(camera, unitInstance = window.unitInstance, walkSpe
                 return;
         }
         cam.move(distanceDelta);
-        unitInstance.move(distanceDelta);
+        unit.move(distanceDelta);
 
-        var tmp = unitInstance.localLocation
+        var tmp = unit.localLocation
         var zCoord = heightAt(tmp);
-        unitInstance.setLocation([tmp[0], tmp[1], zCoord]);
-        // vec3.set(cam.target, cam.location[0], cam.location[1], 0);
-        // vec3.set(cam.target, unitInstance.localLocation[0], unitInstance.localLocation[1], 0);
-        vec3.set(cam.target, unitInstance.localLocation[0], unitInstance.localLocation[1], unitInstance.localLocation[2]);
+        unit.setLocation([tmp[0], tmp[1], zCoord]);
+        vec3.set(cam.target, unit.localLocation[0], unit.localLocation[1], unit.localLocation[2]);
         vec3.set(cam.position, cam.location[0], cam.location[1], cam.position[2]);
         cam.ref_update();
-        // cam.distance = 410;
         if (!isWalking) {
-            console.log('setting walk sequence: ', seqWalk);
-            unitInstance.setSequenceLoopMode(2);
-            // unitInstance.setSequenceLoopMode(0);
-            unitInstance.setSequence(seqWalk);
+            // console.log('setting walk sequence: ', seqWalk);
+            unit.setSequenceLoopMode(2);
+            // unit.setSequenceLoopMode(0);
+            unit.setSequence(seqWalk);
             document.addEventListener('keyup', stopMoving);
             isWalking = true;
-            unitInstance.isWalking = isWalking;
+            unit.isWalking = isWalking;
         }
     }
     document.addEventListener('keydown', listenForArrow);
     window.listenForArrow = listenForArrow;
+    function onClick(e) {
+        if (e.which === 1 || e.button === 0) {
+        //   console.log('Left mouse button at ' + e.clientX + 'x' + e.clientY);
+        }
+        if (e.which === 2 || e.button === 1) {
+        //   console.log('Middle mouse button at ' + e.clientX + 'x' + e.clientY);
+          unit.setSequenceLoopMode(2);
+          unit.setSequence(1);
+        }
+        if (e.which === 3 || e.button === 2) {
+        //   console.log('Right mouse button at ' + e.clientX + 'x' + e.clientY);
+          unit.setSequenceLoopMode(0)
+          unit.setSequence(5) // attack;
+        }
+        if (e.which === 4 || e.button === 3) {
+        //   console.log('Backward mouse button at ' + e.clientX + 'x' + e.clientY);
+        }
+        if (e.which === 5 || e.button === 4) {
+        //   console.log('Forward mouse button at ' + e.clientX + 'x' + e.clientY);
+        }
+    }
+    document.addEventListener('mousedown', onClick); 
 }
 // setArrowKeyListener();
 
